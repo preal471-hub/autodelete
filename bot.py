@@ -19,7 +19,7 @@ messages = []
 ])
 def handle_post(message):
 
-    delete_time = datetime.now() + timedelta(seconds=15)
+    delete_time = datetime.now() + timedelta(hours=72)
 
     messages.append({
         "chat_id": message.chat.id,
@@ -44,3 +44,4 @@ def delete_worker():
 threading.Thread(target=delete_worker).start()
 
 bot.infinity_polling()
+
