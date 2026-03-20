@@ -3,7 +3,7 @@ import time
 import threading
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,24 +31,29 @@ def save_messages():
     'sticker','animation','video_note'
 ])
 def handle_post(message):
-    delete_time = datetime.now() + timedelta(hours=72)
+    try:
+        # 🔥 Keep under 48 hours (safe margin)
+        delete_time = datetime.now(timezone.utc) + timedelta(hours=47, minutes=50)
 
-    msg_data = {
-        "chat_id": message.chat.id,
-        "message_id": message.message_id,
-        "delete_time": delete_time.timestamp()
-    }
+        msg_data = {
+            "chat_id": message.chat.id,
+            "message_id": message.message_id,
+            "delete_time": delete_time.timestamp()
+        }
 
-    messages.append(msg_data)
-    save_messages()
+        messages.append(msg_data)
+        save_messages()
 
-    print(f"Saved message {message.message_id} for deletion")
+        print(f"✅ Saved message {message.message_id} for deletion")
+
+    except Exception as e:
+        print("Save error:", e)
 
 # ---------- DELETE WORKER ----------
 def delete_worker():
     while True:
         try:
-            now = datetime.now().timestamp()
+            now = datetime.now(timezone.utc).timestamp()
 
             for msg in messages[:]:
                 if now >= msg["delete_time"]:
@@ -56,15 +61,20 @@ def delete_worker():
                         bot.delete_message(msg["chat_id"], msg["message_id"])
                         messages.remove(msg)
                         save_messages()
-                        print(f"Deleted message {msg['message_id']}")
-                    except Exception as e:
-                        print("Delete error:", e)
+                        print(f"🗑 Deleted message {msg['message_id']}")
 
-            time.sleep(5)
+                    except Exception as e:
+                        print(f"❌ Delete error for {msg['message_id']}:", e)
+
+                        # 🚀 Remove anyway to stop infinite retry spam
+                        messages.remove(msg)
+                        save_messages()
+
+            time.sleep(10)
 
         except Exception as e:
             print("Worker error:", e)
-            time.sleep(5)
+            time.sleep(10)
 
 # ---------- START THREAD ----------
 threading.Thread(target=delete_worker, daemon=True).start()
@@ -72,8 +82,9 @@ threading.Thread(target=delete_worker, daemon=True).start()
 # ---------- AUTO RECONNECT POLLING ----------
 while True:
     try:
-        print("Bot running...")
+        print("🤖 Bot running...")
         bot.infinity_polling(timeout=60, long_polling_timeout=60)
+
     except Exception as e:
         print("Polling error:", e)
         time.sleep(5)
