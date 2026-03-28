@@ -1,4 +1,4 @@
-import telebot
+99import telebot
 import time
 import threading
 import os
